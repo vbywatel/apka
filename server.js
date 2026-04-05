@@ -6,32 +6,54 @@ const path = require('path');
 const app = express();
 app.use(cors());
 
-// Zwiększ limit rozmiaru plików (ważne dla filmów)
-app.use(express.json({ limit: '500mb' }));
-app.use(express.urlencoded({ limit: '500mb', extended: true }));
+// Statyczne pliki (żeby można było oglądać zdjęcia/filmy)
+app.use('/uploads', express.static('uploads'));
 
-const upload = multer({ 
+const upload = multer({
   dest: 'uploads/',
-  limits: { fileSize: 500 * 1024 * 1024 } // 500 MB
+  limits: { fileSize: 1024 * 1024 * 1024 } // 1 GB
 });
 
 app.post('/upload', upload.single('file'), (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ success: false, message: 'No file uploaded' });
+    return res.status(400).json({ success: false, message: 'Brak pliku' });
   }
 
-  console.log(`Otrzymano plik: ${req.file.originalname} (${req.file.size} bajtów)`);
+  const fileUrl = `https://apka-h7ve.onrender.com/uploads/${req.file.filename}`;
+
+  console.log(`✅ Plik zapisany: ${req.file.originalname} → ${fileUrl}`);
 
   res.json({
     success: true,
+    message: 'Plik zapisany',
     filename: req.file.originalname,
-    size: req.file.size,
-    message: 'Plik zapisany pomyślnie'
+    url: fileUrl
   });
 });
 
+// Nowa strona – lista wszystkich plików
+app.get('/files', (req, res) => {
+  const fs = require('fs');
+  const uploadDir = path.join(__dirname, 'uploads');
+
+  if (!fs.existsSync(uploadDir)) {
+    return res.send('<h2>Folder uploads jest pusty</h2>');
+  }
+
+  const files = fs.readdirSync(uploadDir);
+
+  let html = `<h1>Pliki na serwerze (${files.length})</h1><ul>`;
+  files.forEach(file => {
+    const fileUrl = `/uploads/${file}`;
+    html += `<li><a href="${fileUrl}" target="_blank">${file}</a></li>`;
+  });
+  html += '</ul>';
+
+  res.send(html);
+});
+
 app.get('/', (req, res) => {
-  res.send('Serwer upload działa! Gotowy na pliki z aplikacji.');
+  res.send('<h1>Serwer działa</h1><p><a href="/files">Zobacz wszystkie pliki</a></p>');
 });
 
 const PORT = process.env.PORT || 3000;
